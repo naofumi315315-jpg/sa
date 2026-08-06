@@ -56,7 +56,7 @@ startBtn.addEventListener('click', () => {
   startScreen.classList.add('hidden');
   loadingScreen.classList.remove('hidden');
   getUserLocation();
-  fetchPastEarthquakes(); // 過去の地震履歴を取得
+  fetchPastEarthquakes();
   connectWebSocket();
 });
 
@@ -95,13 +95,11 @@ const initMap = () => {
   }
 };
 
-// --- P2P地震情報 APIから過去の地震履歴を取得 (codes=551に修正) ---
 const fetchPastEarthquakes = async () => {
   try {
     const response = await fetch('https://api.p2pquake.net/v2/history?codes=551&limit=10');
     const data = await response.json();
 
-    // 読み込み中表示をクリア
     const emptyEl = historyList.querySelector('.history-empty');
     if (emptyEl) emptyEl.remove();
 
@@ -204,14 +202,25 @@ const addHistoryFromAPI = (quake, timeStr) => {
   const emptyEl = historyList.querySelector('.history-empty');
   if (emptyEl) emptyEl.remove();
 
-  const timeOnly = timeStr ? (timeStr.split('T')[1]?.substring(0, 5) || timeStr.slice(-8, -3)) : '--:--';
+  // 正確に時刻部分（時・分）を抽出する処理
+  let timeOnly = '--:--';
+  if (timeStr) {
+    const dateObj = new Date(timeStr);
+    if (!isNaN(dateObj)) {
+      const pad = n => String(n).padStart(2, '0');
+      timeOnly = `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+    } else {
+      timeOnly = timeStr.slice(11, 16) || timeStr;
+    }
+  }
+
   const name = quake.hypocenter?.name || '不明';
   const mag = quake.hypocenter?.magnitude || '-';
 
   const item = document.createElement('div');
   item.className = 'history-item';
   item.innerHTML = `
-    <span>${timeOnly} ${name}</span>
+    <span>${timeOnly}　${name}</span>
     <span>M${mag}</span>
   `;
   historyList.prepend(item);
@@ -221,12 +230,18 @@ const addHistoryItem = (originTime, hypoName, mag, label = '') => {
   const emptyEl = historyList.querySelector('.history-empty');
   if (emptyEl) emptyEl.remove();
 
-  const timeStr = originTime.includes(' ') ? originTime.split(' ')[1] : originTime;
+  let timeOnly = originTime;
+  const dateObj = new Date(originTime.replace(/\//g, '-'));
+  if (!isNaN(dateObj)) {
+    const pad = n => String(n).padStart(2, '0');
+    timeOnly = `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+  }
+
   const item = document.createElement('div');
   item.className = 'history-item';
   item.style.borderLeft = '3px solid #f59e0b';
   item.innerHTML = `
-    <span>${label} ${timeStr} ${hypoName}</span>
+    <span>${label} ${timeOnly}　${hypoName}</span>
     <span>M${mag}</span>
   `;
   historyList.prepend(item);
