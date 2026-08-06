@@ -155,7 +155,7 @@ const connectWebSocket = () => {
   };
 
   ws.onclose = () => {
-    statusText.textContent = '🔴 切断 (再接続中...)';
+    statusText.textContent = '🔴 切断 (総接続中...)';
     setTimeout(() => {
       connectWebSocket();
     }, 3000);
@@ -198,22 +198,36 @@ const processEEW = (eew) => {
   }
 };
 
+// 安全に日本時間の時刻文字列を抽出する関数
+const formatTimeString = (timeStr) => {
+  if (!timeStr) return '--:--';
+  // タイムゾーンのズレを防ぐため、文字列から直接時・分を切り出す
+  // 例: "2026/08/06 19:49:00" または "2026-08-06T19:49:00+09:00"
+  try {
+    if (timeStr.includes('T')) {
+      // ISO形式の場合（例: 19:49:00+09:00）
+      const timePart = timeStr.split('T')[1];
+      if (timePart) {
+        return timePart.substring(0, 5); // "19:49"
+      }
+    } else {
+      // スラッシュ区切り形式の場合（例: 2026/08/06 19:49:00）
+      const parts = timeStr.split(' ');
+      if (parts.length > 1) {
+        return parts[1].substring(0, 5); // "19:49"
+      }
+    }
+  } catch (e) {
+    console.error("時間パースエラー:", e);
+  }
+  return '--:--';
+};
+
 const addHistoryFromAPI = (quake, timeStr) => {
   const emptyEl = historyList.querySelector('.history-empty');
   if (emptyEl) emptyEl.remove();
 
-  // 正確に時刻部分（時・分）を抽出する処理
-  let timeOnly = '--:--';
-  if (timeStr) {
-    const dateObj = new Date(timeStr);
-    if (!isNaN(dateObj)) {
-      const pad = n => String(n).padStart(2, '0');
-      timeOnly = `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
-    } else {
-      timeOnly = timeStr.slice(11, 16) || timeStr;
-    }
-  }
-
+  const timeOnly = formatTimeString(timeStr);
   const name = quake.hypocenter?.name || '不明';
   const mag = quake.hypocenter?.magnitude || '-';
 
@@ -230,13 +244,7 @@ const addHistoryItem = (originTime, hypoName, mag, label = '') => {
   const emptyEl = historyList.querySelector('.history-empty');
   if (emptyEl) emptyEl.remove();
 
-  let timeOnly = originTime;
-  const dateObj = new Date(originTime.replace(/\//g, '-'));
-  if (!isNaN(dateObj)) {
-    const pad = n => String(n).padStart(2, '0');
-    timeOnly = `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
-  }
-
+  const timeOnly = formatTimeString(originTime);
   const item = document.createElement('div');
   item.className = 'history-item';
   item.style.borderLeft = '3px solid #f59e0b';
